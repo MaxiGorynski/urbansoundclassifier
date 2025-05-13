@@ -1,0 +1,27 @@
+# Deep Learning Framework
+torch>=1.13.0
+torchvision>=0.14.0
+torchaudio>=0.13.0
+
+# Scientific Computing
+numpy>=1.22.0
+scipy>=1.8.0
+
+# Data Handling and Analysis
+pandas>=1.4.0
+scikit-learn>=1.1.0
+matplotlib>=3.5.0
+
+# Optional: Deployment and Inference
+onnx>=1.12.0  # Cross-platform model export
+
+# Development and Debugging
+pytest>=7.1.0
+jupyter>=1.0.0
+
+# Audio Processing
+librosa>=0.9.1
+soundfile>=0.10.3
+
+# Visualization
+seaborn>=0.11.2
