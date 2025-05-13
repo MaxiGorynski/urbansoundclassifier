@@ -38,3 +38,119 @@ Train Loss: 1.9360, Train Accuracy: 28.21%
 Val Loss: 1.7124, Val Accuracy: 37.62%
 /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 20 leaked semaphore objects to clean up at shutdown
   warnings.warn('resource_tracker: There appear to be %d '
+Traceback (most recent call last):
+  File "/Users/supriyarai/Code/urbansoundclassifier/src/sound_classifier.py", line 927, in main
+    results = classifier.run_pipeline()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/supriyarai/Code/urbansoundclassifier/src/sound_classifier.py", line 825, in run_pipeline
+    training_results = self.train()
+                       ^^^^^^^^^^^^
+  File "/Users/supriyarai/Code/urbansoundclassifier/src/sound_classifier.py", line 611, in train
+    self.initialize_model()
+  File "/Users/supriyarai/Code/urbansoundclassifier/src/sound_classifier.py", line 497, in initialize_model
+    self.model = ImprovedSoundClassificationCNN(num_classes).to(self.device)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/supriyarai/Code/urbansoundclassifier/src/sound_classifier.py", line 332, in __init__
+    feature_size = self.feature_extractor(test_input).numel()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/torch/nn/modules/module.py", line 374, in _forward_unimplemented
+    raise NotImplementedError(f"Module [{type(self).__name__}] is missing the required \"forward\" function")
+NotImplementedError: Module [MultiScaleFeatureExtractor] is missing the required "forward" function
+Using device: cpu
+Loaded 8732 audio files
+Unique labels: ['air_conditioner' 'car_horn' 'children_playing' 'dog_bark' 'drilling'
+ 'engine_idling' 'gun_shot' 'jackhammer' 'siren' 'street_music']
+Dataset split:
+Training samples: 6288
+Validation samples: 1571
+Test samples: 873
+An error occurred during processing: Module [MultiScaleFeatureExtractor] is missing the required "forward" function
+Traceback (most recent call last):
+  File "/Users/supriyarai/Code/urbansoundclassifier/src/sound_classifier.py", line 927, in main
+    results = classifier.run_pipeline()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/supriyarai/Code/urbansoundclassifier/src/sound_classifier.py", line 825, in run_pipeline
+    training_results = self.train()
+                       ^^^^^^^^^^^^
+  File "/Users/supriyarai/Code/urbansoundclassifier/src/sound_classifier.py", line 611, in train
+    self.initialize_model()
+  File "/Users/supriyarai/Code/urbansoundclassifier/src/sound_classifier.py", line 497, in initialize_model
+    self.model = ImprovedSoundClassificationCNN(num_classes).to(self.device)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/supriyarai/Code/urbansoundclassifier/src/sound_classifier.py", line 332, in __init__
+    feature_size = self.feature_extractor(test_input).numel()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/torch/nn/modules/module.py", line 374, in _forward_unimplemented
+    raise NotImplementedError(f"Module [{type(self).__name__}] is missing the required \"forward\" function")
+NotImplementedError: Module [MultiScaleFeatureExtractor] is missing the required "forward" function
+Using device: cpu
+Loaded 8732 audio files
+Unique labels: ['air_conditioner' 'car_horn' 'children_playing' 'dog_bark' 'drilling'
+ 'engine_idling' 'gun_shot' 'jackhammer' 'siren' 'street_music']
+Dataset split:
+Training samples: 6288
+Validation samples: 1571
+Test samples: 873
+An error occurred during processing: Module [MultiScaleFeatureExtractor] is missing the required "forward" function
+Traceback (most recent call last):
+  File "/Users/supriyarai/Code/urbansoundclassifier/src/sound_classifier.py", line 927, in main
+    results = classifier.run_pipeline()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/supriyarai/Code/urbansoundclassifier/src/sound_classifier.py", line 825, in run_pipeline
+    training_results = self.train()
+                       ^^^^^^^^^^^^
+  File "/Users/supriyarai/Code/urbansoundclassifier/src/sound_classifier.py", line 611, in train
+    self.initialize_model()
+  File "/Users/supriyarai/Code/urbansoundclassifier/src/sound_classifier.py", line 497, in initialize_model
+    self.model = ImprovedSoundClassificationCNN(num_classes).to(self.device)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/supriyarai/Code/urbansoundclassifier/src/sound_classifier.py", line 332, in __init__
+    feature_size = self.feature_extractor(test_input).numel()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/torch/nn/modules/module.py", line 374, in _forward_unimplemented
+    raise NotImplementedError(f"Module [{type(self).__name__}] is missing the required \"forward\" function")
+NotImplementedError: Module [MultiScaleFeatureExtractor] is missing the required "forward" function
+Using device: cpu
+Loaded 8732 audio files
+Unique labels: ['air_conditioner' 'car_horn' 'children_playing' 'dog_bark' 'drilling'
+ 'engine_idling' 'gun_shot' 'jackhammer' 'siren' 'street_music']
+Dataset split:
+Training samples: 6288
+Validation samples: 1571
+Test samples: 873
+An error occurred during processing: Module [MultiScaleFeatureExtractor] is missing the required "forward" function
+Using device: cpu
+Loaded 8732 audio files
+Unique labels: ['air_conditioner' 'car_horn' 'children_playing' 'dog_bark' 'drilling'
+ 'engine_idling' 'gun_shot' 'jackhammer' 'siren' 'street_music']
+Dataset split:
+Training samples: 6288
+Validation samples: 1571
+Test samples: 873
+
+Model Architecture:
+Total trainable parameters: 3,284,618
+Epoch 1/25
+Train Loss: 1.2284, Train Accuracy: 41.30%
+Val Loss: 0.7017, Val Accuracy: 60.22%
+Epoch 2/25
+Train Loss: 0.8209, Train Accuracy: 55.60%
+Val Loss: 0.5895, Val Accuracy: 65.37%

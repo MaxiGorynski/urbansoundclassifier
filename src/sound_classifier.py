@@ -8,6 +8,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
 import torchaudio
+import torch.nn.functional as F
+import torchaudio.transforms as T
 import sklearn
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
@@ -243,78 +245,163 @@ class UrbanSoundDataset(Dataset):
         return mel_spectrogram_normalized
 
 
-class SoundClassificationCNN(nn.Module):
+class FocalLoss(nn.Module):
     """
-    Convolutional Neural Network for Sound Classification
+    Focal Loss to handle class imbalance and hard example mining
     """
 
-    def __init__(self, num_classes):
-        super(SoundClassificationCNN, self).__init__()
+    def __init__(self, alpha=1, gamma=2, reduction='mean'):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
 
-        # Convolutional Layers
-        self.conv_layers = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
+    def forward(self, inputs, targets):
+        # Standard cross entropy
+        ce_loss = F.cross_entropy(inputs, targets, reduction='none')
 
-            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
+        # Focal Loss modification
+        pt = torch.exp(-ce_loss)
+        focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss
 
-            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2)
-        )
+        return focal_loss.mean() if self.reduction == 'mean' else focal_loss.sum()
 
-        # Determine the feature dimensions dynamically
-        def _get_feature_size(input_shape):
-            with torch.no_grad():
-                test_input = torch.zeros(1, *input_shape)
-                features = self.conv_layers(test_input)
-                return features.view(1, -1).size(1)
 
-        # Assume input is a mel spectrogram of shape (1, 128, 128)
-        feature_size = _get_feature_size((1, 128, 128))
+class MultiScaleFeatureExtractor(nn.Module):
+    """
+    Multi-scale feature extraction with adaptive pooling
+    """
 
-        # Fully Connected Layers
-        self.fc_layers = nn.Sequential(
-            nn.Linear(feature_size, 256),
-            nn.ReLU(inplace=True),
-            nn.Dropout(0.5),
+    def __init__(self, input_channels=1):
+        super(MultiScaleFeatureExtractor, self).__init__()
 
-            nn.Linear(256, 128),
-            nn.ReLU(inplace=True),
-            nn.Dropout(0.5),
+        # Multiple convolutional layers with different kernel sizes
+        self.conv_branches = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(input_channels, 32, kernel_size=3, padding=1),
+                nn.BatchNorm2d(32),
+                nn.ReLU(),
+                nn.MaxPool2d(2)
+            ),
+            nn.Sequential(
+                nn.Conv2d(input_channels, 32, kernel_size=5, padding=2),
+                nn.BatchNorm2d(32),
+                nn.ReLU(),
+                nn.MaxPool2d(2)
+            ),
+            nn.Sequential(
+                nn.Conv2d(input_channels, 32, kernel_size=7, padding=3),
+                nn.BatchNorm2d(32),
+                nn.ReLU(),
+                nn.MaxPool2d(2)
+            )
+        ])
 
-            nn.Linear(128, num_classes)
-        )
+        # Adaptive pooling to ensure consistent output
+        self.adaptive_pool = nn.AdaptiveAvgPool2d((8, 8))
 
     def forward(self, x):
         """
-        Forward pass through the network
+        Forward pass through the multi-scale feature extractor
 
-        :param x: Input tensor (mel spectrogram)
-        :return: Class predictions
+        :param x: Input tensor
+        :return: Combined multi-scale features
         """
-        # Ensure input is the right shape
-        if x.ndim == 3:
-            x = x.unsqueeze(0)  # Add batch dimension
-        if x.shape[1] != 1:
-            x = x[:, :1]  # Ensure single channel
+        # Extract features from multiple scales
+        multi_scale_features = [
+            branch(x) for branch in self.conv_branches
+        ]
 
-        # Extract features
-        features = self.conv_layers(x)
+        # Combine features
+        combined_features = torch.cat(multi_scale_features, dim=1)
+
+        # Adaptive pooling
+        pooled_features = self.adaptive_pool(combined_features)
+
+        return pooled_features
+
+
+class ImprovedSoundClassificationCNN(nn.Module):
+    """
+    Enhanced Sound Classification Network
+    """
+
+    def __init__(self, num_classes=10):
+        super(ImprovedSoundClassificationCNN, self).__init__()
+
+        # Multi-scale feature extractor
+        self.feature_extractor = MultiScaleFeatureExtractor()
+
+        # Calculate feature size dynamically
+        with torch.no_grad():
+            test_input = torch.zeros(1, 1, 128, 128)
+            feature_size = self.feature_extractor(test_input).numel()
+
+        # Deeper, more regularized fully connected layers
+        self.classifier = nn.Sequential(
+            # First layer with more dropout and weight normalization
+            nn.Linear(feature_size, 512),
+            nn.BatchNorm1d(512),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+
+            # Second layer with progressive regularization
+            nn.Linear(512, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Dropout(0.4),
+
+            # Final classification layer
+            nn.Linear(256, num_classes)
+        )
+
+        # Weight initialization
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        """
+        Custom weight initialization to improve training dynamics
+        """
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.Linear):
+                nn.init.xavier_normal_(m.weight)
+                m.bias.data.fill_(0.01)
+
+    def forward(self, x):
+        # Ensure single channel input
+        if x.dim() == 3:
+            x = x.unsqueeze(1)
+
+        # Extract multi-scale features
+        features = self.feature_extractor(x)
 
         # Flatten features
-        x = features.view(features.size(0), -1)
+        features = features.view(features.size(0), -1)
 
-        # Pass through fully connected layers
-        x = self.fc_layers(x)
+        # Classify
+        return self.classifier(features)
 
-        return x
+
+def create_advanced_training_config():
+    """
+    Create advanced training configuration
+    """
+    return {
+        'loss_function': FocalLoss(),
+        'optimizer_params': {
+            'lr': 0.0001,  # Lower learning rate
+            'weight_decay': 1e-4,  # L2 regularization
+            'eps': 1e-8
+        },
+        'scheduler': {
+            'type': 'cosine_annealing',
+            'T_max': 50,  # Total number of epochs
+            'eta_min': 1e-6  # Minimum learning rate
+        },
+        'gradient_clipping': 1.0  # Clip gradients to prevent exploding
+    }
 
 
 class UrbanSoundClassifier:
@@ -413,7 +500,7 @@ class UrbanSoundClassifier:
         num_classes = len(self.dataset.label_encoder.classes_)
 
         # Create model
-        self.model = SoundClassificationCNN(num_classes).to(self.device)
+        self.model = ImprovedSoundClassificationCNN(num_classes).to(self.device)
 
         # Print model summary
         print("\nModel Architecture:")
@@ -421,7 +508,7 @@ class UrbanSoundClassifier:
         print(f"Total trainable parameters: {total_params:,}")
 
         # Loss and Optimizer
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = FocalLoss()
         self.optimizer = optim.Adam(
             self.model.parameters(),
             lr=0.001,

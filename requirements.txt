@@ -25,3 +25,19 @@ soundfile>=0.10.3
 
 # Visualization
 seaborn>=0.11.2
+
+### FOR FLASK ENDPOINT
+
+# Deep Learning
+torch>=1.13.0
+torchaudio>=0.13.0
+
+# Web Framework
+flask>=2.1.0
+werkzeug>=2.1.0
+
+# Scientific Computing
+numpy>=1.22.0
+
+# Optional: Production Server
+gunicorn>=20.1.0
