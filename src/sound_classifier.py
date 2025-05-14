@@ -321,67 +321,148 @@ class MultiScaleFeatureExtractor(nn.Module):
         return pooled_features
 
 
-class ImprovedSoundClassificationCNN(nn.Module):
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class RegularisedSoundClassificationCNN(nn.Module):
     """
-    Enhanced Sound Classification Network
+    Regularised Convolutional Neural Network for Sound Classification
+
+    Key Improvements:
+    - Smaller, more generalized architecture
+    - Strong regularization techniques
+    - Adaptive feature extraction
     """
 
     def __init__(self, num_classes=10):
-        super(ImprovedSoundClassificationCNN, self).__init__()
+        super(RegularisedSoundClassificationCNN, self).__init__()
 
-        # Multi-scale feature extractor
-        self.feature_extractor = MultiScaleFeatureExtractor()
+        # Convolutional Feature Extractor with Adaptive Parameters
+        self.feature_extractor = nn.Sequential(
+            # First Convolutional Block
+            nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(16),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout2d(0.2),  # Spatial Dropout
 
-        # Calculate feature size dynamically
-        with torch.no_grad():
-            test_input = torch.zeros(1, 1, 128, 128)
-            feature_size = self.feature_extractor(test_input).numel()
+            # Second Convolutional Block
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout2d(0.3),  # Increased Dropout
 
-        # Deeper, more regularized fully connected layers
-        self.classifier = nn.Sequential(
-            # First layer with more dropout and weight normalization
-            nn.Linear(feature_size, 512),
-            nn.BatchNorm1d(512),
-            nn.ReLU(),
-            nn.Dropout(0.5),
-
-            # Second layer with progressive regularization
-            nn.Linear(512, 256),
-            nn.BatchNorm1d(256),
-            nn.ReLU(),
-            nn.Dropout(0.4),
-
-            # Final classification layer
-            nn.Linear(256, num_classes)
+            # Third Convolutional Block with Reduced Complexity
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout2d(0.4)  # Higher Dropout
         )
 
-        # Weight initialization
-        self._initialize_weights()
+        # Dynamically calculate feature size
+        def _get_feature_size(input_shape):
+            with torch.no_grad():
+                test_input = torch.zeros(1, *input_shape)
+                features = self.feature_extractor(test_input)
+                return features.view(1, -1).size(1)
 
-    def _initialize_weights(self):
-        """
-        Custom weight initialization to improve training dynamics
-        """
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, nn.Linear):
-                nn.init.xavier_normal_(m.weight)
-                m.bias.data.fill_(0.01)
+        # Calculate feature size for input (1, 128, 128)
+        feature_size = _get_feature_size((1, 128, 128))
+
+        # Fully Connected Layers with Strong Regularization
+        self.classifier = nn.Sequential(
+            # First Dense Layer with L2 Regularization
+            nn.Linear(feature_size, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.5),  # High Dropout Rate
+
+            # Second Dense Layer
+            nn.Linear(256, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.4),  # Reduced but Significant Dropout
+
+            # Final Classification Layer
+            nn.Linear(128, num_classes)
+        )
 
     def forward(self, x):
+        """
+        Forward pass with enhanced regularization
+        """
         # Ensure single channel input
         if x.dim() == 3:
-            x = x.unsqueeze(1)
+            x = x.unsqueeze(1)  # Add channel dimension
 
-        # Extract multi-scale features
+        # Feature extraction with dropout
         features = self.feature_extractor(x)
 
         # Flatten features
         features = features.view(features.size(0), -1)
 
-        # Classify
+        # Classification with dropout
         return self.classifier(features)
+
+
+class SoftmaxTemperatureScaling(nn.Module):
+    """
+    Temperature scaling to calibrate model confidence
+
+    Helps reduce overconfident predictions
+    """
+
+    def __init__(self, temperature=1.0):
+        super(SoftmaxTemperatureScaling, self).__init__()
+        self.temperature = nn.Parameter(torch.ones(1) * temperature)
+
+    def forward(self, logits):
+        """
+        Scale logits by temperature
+        """
+        return logits / self.temperature
+
+
+class EnsemblePrediction:
+    """
+    Simple ensemble prediction strategy
+
+    Combines multiple prediction techniques to improve robustness
+    """
+
+    def __init__(self, models):
+        self.models = models
+
+        # Temperature scaling for each model
+        self.temperature_scalers = [
+            SoftmaxTemperatureScaling() for _ in models
+        ]
+
+    def predict(self, input_tensor):
+        """
+        Ensemble prediction with weighted averaging
+        """
+        all_predictions = []
+
+        for model, scaler in zip(self.models, self.temperature_scalers):
+            # Get logits
+            logits = model(input_tensor)
+
+            # Apply temperature scaling
+            scaled_logits = scaler(logits)
+
+            # Get probabilities
+            probabilities = F.softmax(scaled_logits, dim=1)
+            all_predictions.append(probabilities)
+
+        # Average predictions
+        ensemble_prediction = torch.mean(torch.stack(all_predictions), dim=0)
+
+        return ensemble_prediction
 
 
 def create_advanced_training_config():
@@ -500,7 +581,7 @@ class UrbanSoundClassifier:
         num_classes = len(self.dataset.label_encoder.classes_)
 
         # Create model
-        self.model = ImprovedSoundClassificationCNN(num_classes).to(self.device)
+        self.model = RegularisedSoundClassificationCNN(num_classes).to(self.device)
 
         # Print model summary
         print("\nModel Architecture:")
