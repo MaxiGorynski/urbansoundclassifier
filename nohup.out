@@ -154,3 +154,111 @@ Val Loss: 0.7017, Val Accuracy: 60.22%
 Epoch 2/25
 Train Loss: 0.8209, Train Accuracy: 55.60%
 Val Loss: 0.5895, Val Accuracy: 65.37%
+Epoch 3/25
+Train Loss: 0.6717, Train Accuracy: 62.63%
+Val Loss: 0.4817, Val Accuracy: 74.86%
+Epoch 4/25
+Train Loss: 0.5687, Train Accuracy: 66.41%
+Val Loss: 0.4348, Val Accuracy: 75.94%
+Epoch 5/25
+Train Loss: 0.4989, Train Accuracy: 70.13%
+Val Loss: 0.4093, Val Accuracy: 76.38%
+Epoch 6/25
+Train Loss: 0.4676, Train Accuracy: 72.09%
+Val Loss: 0.3891, Val Accuracy: 78.23%
+Epoch 7/25
+Train Loss: 0.4589, Train Accuracy: 73.09%
+Val Loss: 0.3815, Val Accuracy: 77.59%
+Epoch 8/25
+Train Loss: 0.4061, Train Accuracy: 74.87%
+Val Loss: 0.3603, Val Accuracy: 79.82%
+Epoch 9/25
+Train Loss: 0.3870, Train Accuracy: 75.76%
+Val Loss: 0.3947, Val Accuracy: 75.37%
+Epoch 10/25
+Train Loss: 0.3630, Train Accuracy: 76.99%
+Val Loss: 0.3254, Val Accuracy: 82.30%
+Epoch 11/25
+Train Loss: 0.3420, Train Accuracy: 77.94%
+Val Loss: 0.3282, Val Accuracy: 80.84%
+Epoch 12/25
+Train Loss: 0.3329, Train Accuracy: 77.77%
+Val Loss: 0.3480, Val Accuracy: 79.69%
+Epoch 13/25
+Train Loss: 0.3110, Train Accuracy: 79.47%
+Val Loss: 0.3077, Val Accuracy: 83.32%
+Epoch 14/25
+Train Loss: 0.2914, Train Accuracy: 80.79%
+Val Loss: 0.2874, Val Accuracy: 84.21%
+Epoch 15/25
+Train Loss: 0.2813, Train Accuracy: 81.46%
+Val Loss: 0.2921, Val Accuracy: 83.83%
+Epoch 16/25
+Train Loss: 0.2824, Train Accuracy: 81.01%
+Val Loss: 0.2816, Val Accuracy: 83.83%
+Epoch 17/25
+Train Loss: 0.2683, Train Accuracy: 82.67%
+Val Loss: 0.3027, Val Accuracy: 82.24%
+Epoch 18/25
+Train Loss: 0.2685, Train Accuracy: 82.06%
+Val Loss: 0.2752, Val Accuracy: 83.51%
+Epoch 19/25
+Train Loss: 0.2741, Train Accuracy: 81.54%
+Val Loss: 0.2865, Val Accuracy: 82.11%
+Epoch 20/25
+Train Loss: 0.2435, Train Accuracy: 83.22%
+Val Loss: 0.2448, Val Accuracy: 86.44%
+Epoch 21/25
+Train Loss: 0.2395, Train Accuracy: 83.57%
+Val Loss: 0.2513, Val Accuracy: 85.36%
+Epoch 22/25
+Train Loss: 0.2347, Train Accuracy: 83.79%
+Val Loss: 0.2438, Val Accuracy: 86.76%
+Epoch 23/25
+Train Loss: 0.2393, Train Accuracy: 83.56%
+Val Loss: 0.2714, Val Accuracy: 83.96%
+Epoch 24/25
+Train Loss: 0.2209, Train Accuracy: 84.89%
+Val Loss: 0.2434, Val Accuracy: 84.66%
+Epoch 25/25
+Train Loss: 0.2232, Train Accuracy: 84.30%
+Val Loss: 0.2360, Val Accuracy: 84.98%
+
+--- Test Evaluation Results ---
+Test Accuracy: 87.51%
+
+Classification Report:
+                  precision    recall  f1-score   support
+
+ air_conditioner       0.87      0.99      0.92        98
+        car_horn       0.97      0.67      0.79        45
+children_playing       0.86      0.86      0.86       100
+        dog_bark       0.65      0.95      0.77        95
+        drilling       0.93      0.84      0.88       107
+   engine_idling       1.00      0.79      0.89        97
+        gun_shot       0.93      0.80      0.86        35
+      jackhammer       0.89      0.93      0.91       121
+           siren       0.98      0.89      0.93        91
+    street_music       0.92      0.87      0.90        84
+
+        accuracy                           0.88       873
+       macro avg       0.90      0.86      0.87       873
+    weighted avg       0.89      0.88      0.88       873
+
+Full model checkpoint saved to: ./sound_classification_output/full_model_checkpoint.pth
+TorchScript model saved to: ./sound_classification_output/traced_model.pt
+ONNX model saved to: ./sound_classification_output/sound_classifier_model.onnx
+
+--- Project Summary ---
+Dataset: /Users/supriyarai/Code/urbansoundclassifier/data/UrbanSound8K
+Total Runtime: 9303.04 seconds
+Best Model Saved to: ./sound_classification_output/best_model.pth
+
+--- Training Results ---
+Final Training Accuracy: 84.30%
+Final Validation Accuracy: 84.98%
+
+--- Test Results ---
+Test Accuracy: 87.51%
+
+Detailed report saved to: ./sound_classification_output/classification_report.txt

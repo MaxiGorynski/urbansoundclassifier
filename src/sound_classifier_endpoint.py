@@ -21,6 +21,97 @@ logger.info(f"NumPy Version: {np.__version__}")
 logger.info(f"Torchaudio Version: {torchaudio.__version__}")
 
 
+# Add these two classes right after the logging section and before the existing SoundClassificationCNN class
+
+class MultiScaleFeatureExtractor(nn.Module):
+    def __init__(self, input_channels=1):
+        super(MultiScaleFeatureExtractor, self).__init__()
+
+        # Multiple convolutional layers with different kernel sizes
+        self.conv_branches = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(input_channels, 32, kernel_size=3, padding=1),
+                nn.BatchNorm2d(32),
+                nn.ReLU(),
+                nn.MaxPool2d(2)
+            ),
+            nn.Sequential(
+                nn.Conv2d(input_channels, 32, kernel_size=5, padding=2),
+                nn.BatchNorm2d(32),
+                nn.ReLU(),
+                nn.MaxPool2d(2)
+            ),
+            nn.Sequential(
+                nn.Conv2d(input_channels, 32, kernel_size=7, padding=3),
+                nn.BatchNorm2d(32),
+                nn.ReLU(),
+                nn.MaxPool2d(2)
+            )
+        ])
+
+        # Adaptive pooling to ensure consistent output
+        self.adaptive_pool = nn.AdaptiveAvgPool2d((8, 8))
+
+    def forward(self, x):
+        # Extract features from multiple scales
+        multi_scale_features = [
+            branch(x) for branch in self.conv_branches
+        ]
+
+        # Combine features
+        combined_features = torch.cat(multi_scale_features, dim=1)
+
+        # Adaptive pooling
+        pooled_features = self.adaptive_pool(combined_features)
+
+        return pooled_features
+
+
+class ImprovedSoundClassificationCNN(nn.Module):
+    """
+    Enhanced Sound Classification Network
+    """
+
+    def __init__(self, num_classes=10):
+        super(ImprovedSoundClassificationCNN, self).__init__()
+
+        # Multi-scale feature extractor
+        self.feature_extractor = MultiScaleFeatureExtractor()
+
+        # Determine the feature dimensions dynamically
+        with torch.no_grad():
+            test_input = torch.zeros(1, 1, 128, 128)
+            feature_size = self.feature_extractor(test_input).numel()
+
+        # Classifier with more sophisticated architecture
+        self.classifier = nn.Sequential(
+            nn.Linear(feature_size, 512),
+            nn.BatchNorm1d(512),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+
+            nn.Linear(512, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Dropout(0.4),
+
+            nn.Linear(256, num_classes)
+        )
+
+    def forward(self, x):
+        # Ensure single channel input
+        if x.dim() == 3:
+            x = x.unsqueeze(1)
+
+        # Extract features
+        features = self.feature_extractor(x)
+
+        # Flatten features
+        features = features.view(features.size(0), -1)
+
+        # Classify
+        return self.classifier(features)
+
 # Recreate the CNN architecture (must match original model)
 class SoundClassificationCNN(nn.Module):
     def __init__(self, num_classes):
@@ -104,7 +195,7 @@ class SoundClassifier:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         # Initialize model architecture
-        self.model = SoundClassificationCNN(len(self.classes))
+        self.model = ImprovedSoundClassificationCNN(len(self.classes))
 
         # Load state dict
         state_dict = torch.load(model_path, map_location=self.device)
