@@ -1,289 +1,221 @@
 import os
-import sys
-import logging
 import torch
 import torchaudio
-import numpy as np
-import torch.nn as nn
+import logging
 from flask import Flask, request, jsonify
-from werkzeug.utils import secure_filename
 import tempfile
-import argparse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Log system information
-logger.info(f"Python Version: {sys.version}")
-logger.info(f"PyTorch Version: {torch.__version__}")
-logger.info(f"NumPy Version: {np.__version__}")
-logger.info(f"Torchaudio Version: {torchaudio.__version__}")
 
-
-# Add these two classes right after the logging section and before the existing SoundClassificationCNN class
-
-class MultiScaleFeatureExtractor(nn.Module):
-    def __init__(self, input_channels=1):
-        super(MultiScaleFeatureExtractor, self).__init__()
-
-        # Multiple convolutional layers with different kernel sizes
-        self.conv_branches = nn.ModuleList([
-            nn.Sequential(
-                nn.Conv2d(input_channels, 32, kernel_size=3, padding=1),
-                nn.BatchNorm2d(32),
-                nn.ReLU(),
-                nn.MaxPool2d(2)
-            ),
-            nn.Sequential(
-                nn.Conv2d(input_channels, 32, kernel_size=5, padding=2),
-                nn.BatchNorm2d(32),
-                nn.ReLU(),
-                nn.MaxPool2d(2)
-            ),
-            nn.Sequential(
-                nn.Conv2d(input_channels, 32, kernel_size=7, padding=3),
-                nn.BatchNorm2d(32),
-                nn.ReLU(),
-                nn.MaxPool2d(2)
-            )
-        ])
-
-        # Adaptive pooling to ensure consistent output
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((8, 8))
-
-    def forward(self, x):
-        # Extract features from multiple scales
-        multi_scale_features = [
-            branch(x) for branch in self.conv_branches
-        ]
-
-        # Combine features
-        combined_features = torch.cat(multi_scale_features, dim=1)
-
-        # Adaptive pooling
-        pooled_features = self.adaptive_pool(combined_features)
-
-        return pooled_features
-
-
-class ImprovedSoundClassificationCNN(nn.Module):
-    """
-    Enhanced Sound Classification Network
-    """
-
+# Model and sound classification
+class SoundClassificationCNN(torch.nn.Module):
     def __init__(self, num_classes=10):
-        super(ImprovedSoundClassificationCNN, self).__init__()
+        super(SoundClassificationCNN, self).__init__()
 
-        # Multi-scale feature extractor
-        self.feature_extractor = MultiScaleFeatureExtractor()
+        # Convolutional Feature Extractor with Adaptive Parameters
+        self.feature_extractor = torch.nn.Sequential(
+            # First Convolutional Block
+            torch.nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1),
+            torch.nn.BatchNorm2d(16),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.MaxPool2d(kernel_size=2, stride=2),
+            torch.nn.Dropout2d(0.2),  # Spatial Dropout
 
-        # Determine the feature dimensions dynamically
-        with torch.no_grad():
-            test_input = torch.zeros(1, 1, 128, 128)
-            feature_size = self.feature_extractor(test_input).numel()
+            # Second Convolutional Block
+            torch.nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
+            torch.nn.BatchNorm2d(32),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.MaxPool2d(kernel_size=2, stride=2),
+            torch.nn.Dropout2d(0.3),  # Increased Dropout
 
-        # Classifier with more sophisticated architecture
-        self.classifier = nn.Sequential(
-            nn.Linear(feature_size, 512),
-            nn.BatchNorm1d(512),
-            nn.ReLU(),
-            nn.Dropout(0.5),
+            # Third Convolutional Block with Reduced Complexity
+            torch.nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            torch.nn.BatchNorm2d(64),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.MaxPool2d(kernel_size=2, stride=2),
+            torch.nn.Dropout2d(0.4)  # Higher Dropout
+        )
 
-            nn.Linear(512, 256),
-            nn.BatchNorm1d(256),
-            nn.ReLU(),
-            nn.Dropout(0.4),
+        # Dynamically calculate feature size
+        def _get_feature_size(input_shape):
+            with torch.no_grad():
+                test_input = torch.zeros(1, *input_shape)
+                features = self.feature_extractor(test_input)
+                return features.view(1, -1).size(1)
 
-            nn.Linear(256, num_classes)
+        # Calculate feature size for input (1, 128, 128)
+        feature_size = _get_feature_size((1, 128, 128))
+
+        # Classifier with strong regularization
+        self.classifier = torch.nn.Sequential(
+            # First dense layer with L2 regularization
+            torch.nn.Linear(feature_size, 256),
+            torch.nn.BatchNorm1d(256),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.Dropout(0.5),
+
+            # Second dense layer
+            torch.nn.Linear(256, 128),
+            torch.nn.BatchNorm1d(128),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.Dropout(0.4),
+
+            # Final classification layer
+            torch.nn.Linear(128, num_classes)
         )
 
     def forward(self, x):
         # Ensure single channel input
         if x.dim() == 3:
-            x = x.unsqueeze(1)
+            x = x.unsqueeze(1)  # Add channel dimension
 
-        # Extract features
+        # Feature extraction with dropout
         features = self.feature_extractor(x)
 
         # Flatten features
         features = features.view(features.size(0), -1)
 
-        # Classify
+        # Classification with dropout
         return self.classifier(features)
-
-# Recreate the CNN architecture (must match original model)
-class SoundClassificationCNN(nn.Module):
-    def __init__(self, num_classes):
-        super(SoundClassificationCNN, self).__init__()
-
-        # Convolutional Layers
-        self.conv_layers = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-
-            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-
-            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2)
-        )
-
-        # Determine the feature dimensions dynamically
-        def _get_feature_size(input_shape):
-            with torch.no_grad():
-                test_input = torch.zeros(1, *input_shape)
-                features = self.conv_layers(test_input)
-                return features.view(1, -1).size(1)
-
-        # Assume input is a mel spectrogram of shape (1, 128, 128)
-        feature_size = _get_feature_size((1, 128, 128))
-
-        # Fully Connected Layers
-        self.fc_layers = nn.Sequential(
-            nn.Linear(feature_size, 256),
-            nn.ReLU(inplace=True),
-            nn.Dropout(0.5),
-
-            nn.Linear(256, 128),
-            nn.ReLU(inplace=True),
-            nn.Dropout(0.5),
-
-            nn.Linear(128, num_classes)
-        )
-
-    def forward(self, x):
-        # Ensure input is the right shape
-        if x.ndim == 3:
-            x = x.unsqueeze(0)  # Add batch dimension
-        if x.shape[1] != 1:
-            x = x[:, :1]  # Ensure single channel
-
-        # Extract features
-        features = self.conv_layers(x)
-
-        # Flatten features
-        x = features.view(features.size(0), -1)
-
-        # Pass through fully connected layers
-        x = self.fc_layers(x)
-
-        return x
 
 
 class SoundClassifier:
     def __init__(self, model_path):
         """
-        Initialize sound classifier
-
-        :param model_path: Path to the trained model checkpoint
+        Initialize sound classifier with detailed logging
         """
-        # Known classes from original training
+        # Known classes
         self.classes = [
             'air_conditioner', 'car_horn', 'children_playing', 'dog_bark',
             'drilling', 'engine_idling', 'gun_shot', 'jackhammer',
             'siren', 'street_music'
         ]
 
-        # Load the model
+        # Device
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        # Initialize model architecture
-        self.model = ImprovedSoundClassificationCNN(len(self.classes))
+        # Load the model
+        try:
+            # Check model file exists
+            if not os.path.exists(model_path):
+                raise FileNotFoundError(f"Model not found at {model_path}")
 
-        # Load state dict
-        state_dict = torch.load(model_path, map_location=self.device)
+            # Load checkpoint
+            checkpoint = torch.load(model_path, map_location=self.device)
 
-        # If the state dict has a 'model_state_dict' key (from full checkpoint)
-        if 'model_state_dict' in state_dict:
-            state_dict = state_dict['model_state_dict']
+            # Detailed checkpoint investigation
+            logger.info("Checkpoint Keys:")
+            for key in checkpoint.keys():
+                logger.info(f"  {key}")
 
-        self.model.load_state_dict(state_dict)
-        self.model.eval()
+            # Determine the correct state dict
+            if 'model_state_dict' in checkpoint:
+                state_dict = checkpoint['model_state_dict']
+                logger.info("Using 'model_state_dict'")
+            else:
+                state_dict = checkpoint
+                logger.info("Using entire checkpoint as state dict")
 
-    def _audio_to_mel_spectrogram(self, waveform, sample_rate):
+            # Log state dict keys
+            logger.info("State Dict Keys:")
+            for key, tensor in state_dict.items():
+                logger.info(f"  {key}: {tensor.shape}")
+
+            # Create model with the exact architecture
+            self.model = SoundClassificationCNN(len(self.classes)).to(self.device)
+
+            # Try loading with different strategies
+            try:
+                # First, try strict loading
+                self.model.load_state_dict(state_dict, strict=True)
+            except RuntimeError:
+                # If strict fails, try partial loading
+                logger.warning("Strict loading failed. Attempting partial loading.")
+                model_dict = self.model.state_dict()
+
+                # Filter out incompatible keys
+                filtered_state_dict = {k: v for k, v in state_dict.items()
+                                       if k in model_dict and v.shape == model_dict[k].shape}
+
+                # Update model dict
+                model_dict.update(filtered_state_dict)
+
+                # Load with some flexibility
+                self.model.load_state_dict(model_dict, strict=False)
+
+            self.model.eval()
+            logger.info("Model loaded successfully")
+
+        except Exception as e:
+            logger.error(f"Model loading error: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def _preprocess_audio(self, audio_path):
         """
-        Convert audio to mel spectrogram
-
-        :param waveform: Input audio waveform
-        :param sample_rate: Sample rate of the audio
-        :return: Normalized mel spectrogram
+        Convert audio to mel spectrogram with more robust preprocessing
         """
+        # Load audio
+        waveform, sample_rate = torchaudio.load(audio_path)
+
         # Resample if needed
         if sample_rate != 22050:
             resampler = torchaudio.transforms.Resample(sample_rate, 22050)
             waveform = resampler(waveform)
             sample_rate = 22050
 
-        # Ensure mono audio
+        # Ensure mono
         if waveform.shape[0] > 1:
             waveform = torch.mean(waveform, dim=0, keepdim=True)
 
-        # Trim or pad to 4 seconds
-        target_length = 4 * sample_rate
-        if waveform.shape[1] > target_length:
-            waveform = waveform[:, :target_length]
-        else:
-            pad_length = target_length - waveform.shape[1]
-            waveform = torch.nn.functional.pad(waveform, (0, pad_length))
-
-        # Create mel spectrogram
-        mel_spectrogram_transform = torchaudio.transforms.MelSpectrogram(
+        # Mel spectrogram
+        mel_transform = torchaudio.transforms.MelSpectrogram(
             sample_rate=sample_rate,
             n_mels=128,
             n_fft=2048,
             hop_length=512
         )
+        mel_spec = mel_transform(waveform)
 
-        mel_spectrogram = mel_spectrogram_transform(waveform)
-
-        # Convert to decibels
-        mel_spectrogram_db = torchaudio.transforms.AmplitudeToDB()(mel_spectrogram)
-
-        # Manually resize to 128x128 using interpolation
-        mel_spectrogram_db = mel_spectrogram_db.squeeze()
-
-        # Resize using torch.nn.functional interpolate
-        mel_spectrogram_resized = torch.nn.functional.interpolate(
-            mel_spectrogram_db.unsqueeze(0).unsqueeze(0),
+        # Convert to decibels and resize
+        mel_spec_db = torchaudio.transforms.AmplitudeToDB()(mel_spec)
+        mel_spec_resized = torch.nn.functional.interpolate(
+            mel_spec_db.unsqueeze(0),
             size=(128, 128),
             mode='bilinear',
             align_corners=False
-        ).squeeze()
+        ).squeeze(0)
 
         # Normalize
-        mel_spectrogram_normalized = (
-                                                 mel_spectrogram_resized - mel_spectrogram_resized.mean()) / mel_spectrogram_resized.std()
+        mel_spec_normalized = (mel_spec_resized - mel_spec_resized.mean()) / mel_spec_resized.std()
 
-        return mel_spectrogram_normalized
+        return mel_spec_normalized
 
     def predict(self, audio_path):
         """
-        Predict sound class for an audio file
-
-        :param audio_path: Path to audio file
-        :return: Prediction results
+        Predict sound class for an audio file with detailed logging
         """
         try:
-            # Load audio file
-            waveform, sample_rate = torchaudio.load(audio_path)
+            # Preprocess audio
+            mel_spec = self._preprocess_audio(audio_path)
 
-            # Convert to mel spectrogram
-            mel_spectrogram = self._audio_to_mel_spectrogram(waveform, sample_rate)
+            # Ensure correct shape: [batch_size, channels, height, width]
+            input_tensor = mel_spec.unsqueeze(0).to(self.device)
 
-            # Add batch and channel dimensions
-            mel_spectrogram = mel_spectrogram.unsqueeze(0).unsqueeze(0)
+            # Log input tensor details
+            logger.info(f"Input Tensor Shape: {input_tensor.shape}")
 
             # Predict
             with torch.no_grad():
-                outputs = self.model(mel_spectrogram)
+                outputs = self.model(input_tensor)
+                logger.info(f"Raw Outputs: {outputs}")
+
                 probabilities = torch.softmax(outputs, dim=1)[0]
+                logger.info(f"Probabilities: {probabilities}")
 
                 # Get top 3 predictions
                 top_3_prob, top_3_indices = torch.topk(probabilities, 3)
@@ -299,88 +231,59 @@ class SoundClassifier:
                 return predictions
 
         except Exception as e:
+            logger.error(f"Prediction error: {e}")
+            import traceback
+            traceback.print_exc()
             return {'error': str(e)}
 
 
-# Flask API
+# Flask Application
 app = Flask(__name__)
 
-# Initialize model (adjust path as needed)
-MODEL_PATH = './sound_classification_output/best_model.pth'
+# Hardcoded model path
+MODEL_PATH = '/Users/supriyarai/Code/urbansoundclassifier/sound_classification_output/best_model.pth'
 
-
-@app.route('/', methods=['GET'])
-def health_check():
-    """
-    Simple health check endpoint
-    """
-    return jsonify({
-        'status': 'healthy',
-        'message': 'Sound Classification Endpoint is running',
-        'model_path': MODEL_PATH
-    }), 200
+# Initialize classifier globally
+try:
+    classifier = SoundClassifier(MODEL_PATH)
+    logger.info("Classifier initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize classifier: {e}")
+    classifier = None
 
 
 @app.route('/predict', methods=['POST'])
 def predict_sound():
-    """
-    Endpoint for sound classification
-
-    Expects audio file in request
-    """
-    try:
-        # Initialize classifier here to catch any initialization errors
-        classifier = SoundClassifier(MODEL_PATH)
-    except Exception as init_error:
-        logger.error(f"Model initialization error: {init_error}")
+    # Check if classifier is loaded
+    if not classifier:
         return jsonify({
-            'error': 'Failed to initialize model',
-            'details': str(init_error)
+            'error': 'Classifier not initialized',
+            'details': 'Model could not be loaded'
         }), 500
 
+    # Check if file is present
     if 'file' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
 
-    file = request.files['file']
-
-    # Create a temporary file
+    # Save uploaded file temporarily
     with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_file:
-        file.save(temp_file.name)
+        request.files['file'].save(temp_file.name)
 
-        try:
-            # Predict
-            predictions = classifier.predict(temp_file.name)
+    try:
+        # Predict
+        predictions = classifier.predict(temp_file.name)
 
-            # Clean up temporary file
-            os.unlink(temp_file.name)
+        # Clean up temporary file
+        os.unlink(temp_file.name)
 
-            return jsonify(predictions)
+        return jsonify(predictions)
 
-        except Exception as e:
-            # Ensure temp file is deleted even if prediction fails
-            os.unlink(temp_file.name)
-            logger.error(f"Prediction error: {e}")
-            return jsonify({'error': str(e)}), 500
-
-
-def parse_arguments():
-    """
-    Parse command-line arguments
-    """
-    parser = argparse.ArgumentParser(description='Sound Classification Endpoint')
-    parser.add_argument('--host', type=str, default='127.0.0.1',
-                        help='Host to bind the server')
-    parser.add_argument('--port', type=int, default=5005,
-                        help='Port to run the server')
-    return parser.parse_args()
+    except Exception as e:
+        # Ensure temp file is deleted
+        os.unlink(temp_file.name)
+        logger.error(f"Prediction error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
-    # Parse arguments
-    args = parse_arguments()
-
-    # Log startup information
-    logger.info(f"Starting server on {args.host}:{args.port}")
-
-    # Run the Flask app
-    app.run(host=args.host, port=args.port, debug=True)
+    app.run(host='127.0.0.1', port=5005, debug=True)

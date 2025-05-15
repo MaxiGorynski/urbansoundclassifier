@@ -130,10 +130,9 @@ class UrbanSoundDataset(Dataset):
     def _process_dataset(self):
         """
         Process the dataset and collect audio file paths and labels
-        Specifically looks in the audio/fold* directories
         """
         # Construct the audio directory path
-        audio_dir = os.path.join(self.dataset_dir, 'audio')
+        audio_dir = os.path.join(self.dataset_dir)
 
         # Check if audio directory exists
         if not os.path.exists(audio_dir):
@@ -142,8 +141,12 @@ class UrbanSoundDataset(Dataset):
         # Try to find metadata CSV
         metadata_path = os.path.join(self.dataset_dir, 'urbansound8k.csv')
 
-        # If metadata CSV exists, use it for precise labeling
+        # Collect all .wav files
+        audio_files = []
+        labels = []
+
         if os.path.exists(metadata_path):
+            # Use metadata CSV for more accurate labeling
             metadata = pd.read_csv(metadata_path)
 
             for _, row in metadata.iterrows():
@@ -155,37 +158,58 @@ class UrbanSoundDataset(Dataset):
                 audio_path = os.path.join(audio_dir, f'fold{fold}', filename)
 
                 if os.path.exists(audio_path):
-                    self.audio_files.append(audio_path)
-                    self.labels.append(label)
-
-        # Fallback to directory scanning
+                    audio_files.append(audio_path)
+                    labels.append(label)
         else:
-            # Scan fold directories
-            for fold in range(1, 11):  # 10 folds in UrbanSound8K
-                fold_path = os.path.join(audio_dir, f'fold{fold}')
-
-                if not os.path.exists(fold_path):
-                    print(f"Warning: Fold directory not found: {fold_path}")
-                    continue
-
-                for filename in os.listdir(fold_path):
+            # Scan all directories for .wav files
+            for root, _, files in os.walk(audio_dir):
+                for filename in files:
                     if filename.endswith('.wav'):
-                        audio_path = os.path.join(fold_path, filename)
-                        self.audio_files.append(audio_path)
+                        audio_path = os.path.join(root, filename)
+                        audio_files.append(audio_path)
 
-                        # Extract label from filename
+                        # Extract label from filename or directory structure
                         label = self._extract_label(filename)
-                        self.labels.append(label)
+                        labels.append(label)
 
-        # Ensure we found some audio files
-        if not self.audio_files:
+        # Ensure we found audio files
+        if not audio_files:
             raise ValueError("No audio files found. Check dataset directory structure.")
 
-        # Encode labels
-        self.labels = self.label_encoder.fit_transform(self.labels)
+        # Set class attributes
+        self.audio_files = audio_files
+        self.labels = self.label_encoder.fit_transform(labels)
 
         print(f"Loaded {len(self.audio_files)} audio files")
         print(f"Unique labels: {self.label_encoder.classes_}")
+
+    def _extract_label(self, filename):
+        """
+        Extract label from filename
+        """
+        # Known classes
+        known_classes = [
+            'air_conditioner', 'car_horn', 'children_playing', 'dog_bark',
+            'drilling', 'engine_idling', 'gun_shot', 'jackhammer',
+            'siren', 'street_music'
+        ]
+
+        # Try to match known classes
+        for known_class in known_classes:
+            if known_class in filename.lower():
+                return known_class
+
+        # Fallback mechanism
+        name_parts = filename.split('-')
+        if len(name_parts) > 1:
+            try:
+                class_id = int(name_parts[1])
+                if 0 <= class_id < len(known_classes):
+                    return known_classes[class_id]
+            except (ValueError, IndexError):
+                pass
+
+        return 'unknown'
 
     def _audio_to_mel_spectrogram(self, waveform, sample_rate):
         """
